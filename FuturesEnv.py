@@ -114,8 +114,9 @@ class FuturesEnv(py_environment.PyEnvironment):
             self._episode_ended = True;
         # 4) update dataset iterator
         self.index += 1;
+        # 5) return
         if self._episode_ended:
-            return ts.termination((self._positions,self._profit), self.capital + self._profit + unsettled_profit);
+            return ts.termination((self._positions,self._profit), self._profit + unsettled_profit);
         else:
-            return ts.transition((self._positions,self._profit), reward = 0.0, discount = 1.0);
+            return ts.transition((self._positions,self._profit), reward = self._profit + unsettled_profit, discount = 0.3);
 
