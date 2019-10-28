@@ -33,34 +33,89 @@ class FuturesEnv(py_environment.PyEnvironment):
             minimum = [0, 0],
             maximum = [np.inf, np.inf],
             name = 'observation');
-        self._state = capital;
+        self._positions = list();
+        self._profit = 0;
         self._episode_ended = False;
         # customized member
         self.capital = capital;
         self.dataset = dataset;
         self.index = 0;
-        self.positions = list();
     def action_spec(self):
         return self._action_spec;
     def observation_spec(self):
         return self._observation_spec;
     def _reset(self):
-        self._state = self.capital;
+        self._positions = list();
+        self._profit = 0;
         self._episode_ended = False;
         # customized member
         self.index = 0;
-        self.positions = list();
-        return ts.restart(np.array([self._state], dtype = np.int32));
+        return ts.restart((self._positions,self._profit));
     def _step(self, action):
-        # auto reset
+        # 1) reset condition
         if self._episode_ended:
             return self.reset();
-        # end episode conditions
-        if self._state <= 0 or self.index == len(self.dataset):
+        # 2) state transition
+        sell_price = self.dataset[self.index, 0];
+        buy_price = self.dataset[self.index, 1];
+        # add position into state
+        if action[0] != 2:
+            # sell or buy
+            assert sell_price <= buy_price;
+            if action[0] == 0:
+                # when sell, stop profit/loss price for buy price
+                stop_profit_price = buy_price - 0.01 * action[2];
+                stop_loss_price = buy_price + 0.01 * action[3];
+                # (sell, lever scale, sell price, stop_profit_price, stop_loss_price)
+                self._state.append((action[0], action[1], sell_price, stop_profit_price, stop_loss_price));
+            else:
+                # when buy, stop profit/loss price for sell price
+                stop_profit_price = sell_price + 0.01 * action[2];
+                stop_loss_price = sell_price - 0.01 * action[3];
+                # (buy, lever scale, buy price, stop_profit_price, stop_loss_price)
+                self._state.append((action[0], action[1], buy_price, stop_profit_price, stop_loss_price));
+        # check whether a position need to be closed out
+        left_positions = list();
+        unsettled_profit = 0;
+        for position in self._positions:
+            stop_profit_price = position[3];
+            stop_loss_price = position[4];
+            if position[0] == 0:
+                # sell
+                prev_sell_price = position[2];
+                if buy_price <= stop_profit_price or buy_price >= stop_loss_price:
+                    # settled profit by short selling
+                    self._profit += position[1] * (prev_sell_price - buy_price);
+                    close_out = True;
+                else:
+                    # unsettled profit by short selling
+                    unsettled_profit += position[1] * (prev_sell_price - buy_price);
+                    close_out = False;
+            else position[0] == 1:
+                # buy
+                prev_buy_price = position[2];
+                if sell_price >= stop_profit_price or sell_price <= stop_loss_price:
+                    # settled profit by going long
+                    self._profit += position[1] * (sell_price - prev_buy_price);
+                    close_out = True;
+                else:
+                    # unsettled profit by going long
+                    unsettled_profit += position[1] * (sell_price - prev_buy_price);
+                    close_out = False;
+            if close_out == False:
+                left_positions.append(position);
+        self._positions = left_positions;
+        # 3) end episode conditions
+        if self.index == len(self.dataset):
+            # end of dataset
             self._episode_ended = True;
-        # state transition
-        if action[0] == 0:
-            # if buy
-            # TODO
-
+        if self.capital + self._profit + unsettled_profit <= 0:
+            # mandatory liquidation
+            self._episode_ended = True;
+        # 4) update dataset iterator
+        self.index += 1;
+        if self._episode_ended:
+            return ts.termination((self._positions,self._profit), self.capital + self._profit + unsettled_profit);
+        else:
+            return ts.transition((self._positions,self._profit), reward = 0.0, discount = 1.0);
 
