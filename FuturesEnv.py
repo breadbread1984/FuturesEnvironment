@@ -19,15 +19,15 @@ class FuturesEnv(py_environment.PyEnvironment):
             (4,),
             dtype = np.int32,
             # transaction: sell(0), buy(1), none(2)
-            # lever: n * 0.01
+            # lever: n * 0.01; sell(n>0), buy(n<0), none(n=0)
             # stop-profit price: when buy: price + n * 0.01; when sell: price - n * 0.01
             # stop-loss price: when buy: price - n * 0.01; when sell: price + n * 0.01
-            minimum = [0, 1, 1, 1],
-            maximum = [2, 100, np.inf, np.inf],
+            minimum = [-100, 1, 1],
+            maximum = [100, np.inf, np.inf],
             name = 'action');
         self._observation_spec = array_spec.BoundedArraySpec(
             (2,),
-            dtype = np.int32,
+            dtype = np.float32,
             # buying price: n * 0.01
             # selling price: n * 0.01 
             minimum = [0, 0],
@@ -59,48 +59,48 @@ class FuturesEnv(py_environment.PyEnvironment):
         sell_price = self.dataset[self.index, 0];
         buy_price = self.dataset[self.index, 1];
         # add position into state
-        if action[0] != 2:
+        if action[0] != 0:
             # sell or buy
             assert sell_price <= buy_price;
-            if action[0] == 0:
+            if action[0] > 0:
                 # when sell, stop profit/loss price for buy price
-                stop_profit_price = buy_price - 0.01 * action[2];
-                stop_loss_price = buy_price + 0.01 * action[3];
+                stop_profit_price = buy_price - 0.01 * action[1];
+                stop_loss_price = buy_price + 0.01 * action[2];
                 # (sell, lever scale, sell price, stop_profit_price, stop_loss_price)
-                self._state.append((action[0], action[1], sell_price, stop_profit_price, stop_loss_price));
+                self._state.append((action[0], sell_price, stop_profit_price, stop_loss_price));
             else:
                 # when buy, stop profit/loss price for sell price
-                stop_profit_price = sell_price + 0.01 * action[2];
-                stop_loss_price = sell_price - 0.01 * action[3];
+                stop_profit_price = sell_price + 0.01 * action[1];
+                stop_loss_price = sell_price - 0.01 * action[2];
                 # (buy, lever scale, buy price, stop_profit_price, stop_loss_price)
-                self._state.append((action[0], action[1], buy_price, stop_profit_price, stop_loss_price));
+                self._state.append((action[0], buy_price, stop_profit_price, stop_loss_price));
         # check whether a position need to be closed out
         left_positions = list();
         unsettled_profit = 0;
         for position in self._positions:
             stop_profit_price = position[3];
             stop_loss_price = position[4];
-            if position[0] == 0:
+            if position[0] > 0:
                 # sell
-                prev_sell_price = position[2];
+                prev_sell_price = position[1];
                 if buy_price <= stop_profit_price or buy_price >= stop_loss_price:
                     # settled profit by short selling
-                    self._profit += position[1] * (prev_sell_price - buy_price);
+                    self._profit += abs(position[0]) * (prev_sell_price - buy_price);
                     close_out = True;
                 else:
                     # unsettled profit by short selling
-                    unsettled_profit += position[1] * (prev_sell_price - buy_price);
+                    unsettled_profit += abs(position[0]) * (prev_sell_price - buy_price);
                     close_out = False;
-            else position[0] == 1:
+            else position[0] < 0:
                 # buy
-                prev_buy_price = position[2];
+                prev_buy_price = position[1];
                 if sell_price >= stop_profit_price or sell_price <= stop_loss_price:
                     # settled profit by going long
-                    self._profit += position[1] * (sell_price - prev_buy_price);
+                    self._profit += abs(position[0]) * (sell_price - prev_buy_price);
                     close_out = True;
                 else:
                     # unsettled profit by going long
-                    unsettled_profit += position[1] * (sell_price - prev_buy_price);
+                    unsettled_profit += abs(position[0]) * (sell_price - prev_buy_price);
                     close_out = False;
             if close_out == False:
                 left_positions.append(position);
