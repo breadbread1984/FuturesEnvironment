@@ -24,7 +24,7 @@ class FuturesEnv(py_environment.PyEnvironment):
             # stop-profit price: when buy: price + n * 0.01; when sell: price - n * 0.01
             # stop-loss price: when buy: price - n * 0.01; when sell: price + n * 0.01
             minimum = [-100, 1, 1],
-            maximum = [100, np.inf, np.inf],
+            maximum = [100, 10000, 10000],
             name = 'action');
         self._observation_spec = array_spec.BoundedArraySpec(
             (2,),
