@@ -11,6 +11,12 @@ install prerequisite package with
 pip3 install -U gym tf-agents-nightly
 ```
 
+you also need to install MetaTrader 5 to execute the dataset download script. fortunately, MetaTrader 5 can run on wine perfectly.
+
+## download the dataset
+
+edit the download_dataset.mq5 file with MetaEditor. change the symbol to whatever you want to deal with. execute the script to download the dataset in csv format into dataset directory under MQL5 director of MetaTrader 5.
+
 ## environment specification
 the observation is a vector of length 2 which represents the sell price and buy price by minites respectively.
 
