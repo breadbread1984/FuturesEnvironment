@@ -16,6 +16,8 @@ input string output = "dataset";
 //+------------------------------------------------------------------+
 void OnStart()
 {
+  FolderDelete(output);
+  FolderCreate(output);
   for (int y = from_year ; y <= to_year ; y++) {
     for (int m = 1 ; m <= 12 ; m += 3) {
       // 3 month's ticks per file
@@ -32,7 +34,7 @@ void OnStart()
       ZeroMemory(ticks);
       int copyTime = CopyTicksRange(symbol, ticks, COPY_TICKS_ALL, from_datetime, to_datetime);
       // write to file      
-      int file = FileOpen(output + "\\" + filename, FILE_WRITE|FILE_COMMON);
+      int file = FileOpen(output + "/" + filename, FILE_WRITE|FILE_COMMON);
       // save to file
       int size = ArraySize(ticks);
       FileWriteString(file, "datetime\tbid\task\tlast\tvolume\ttime_msc\tflags\tvolumn_real\n");
