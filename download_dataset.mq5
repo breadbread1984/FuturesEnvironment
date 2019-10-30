@@ -24,7 +24,7 @@ void OnStart()
       string strTime = y + "/" + from_month + "/" + 1 + " " + 0 + ":" + 0 + ":" + 0;
       datetime from_datetime = StrToTime(strTime);
       int last_day = (to_month == 3||to_month == 12)?31:30;
-      strTime = y + "/" + to_month + "/" + last_day + " " + 24 + ":" + 59 + ":" + 59;
+      strTime = y + "/" + to_month + "/" + last_day + " " + 23 + ":" + 59 + ":" + 59;
       string filename = StringFormat("%s_%s_%s.csv", symbol, TimeToString(from_datetime), TimeToString(to_datetime));
       double ticks[];
       ZeroMemory(ticks);
