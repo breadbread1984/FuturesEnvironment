@@ -21,19 +21,20 @@ void OnStart()
       // 3 month's ticks per file
       int from_month = m;
       int to_month = m + 2;
-      string strTime = y + "/" + from_month + "/" + 1 + " " + 0 + ":" + 0 + ":" + 0;
-      datetime from_datetime = StrToTime(strTime);
+      string strTime = IntegerToString(y) + "/" + IntegerToString(from_month) + "/1" + " 00:00:00";
+      datetime from_datetime = StringToTime(strTime);
       int last_day = (to_month == 3||to_month == 12)?31:30;
-      strTime = y + "/" + to_month + "/" + last_day + " " + 23 + ":" + 59 + ":" + 59;
+      strTime = IntegerToString(y) + "/" + IntegerToString(to_month) + "/" + IntegerToString(last_day) + " 23:59:59";
+      datetime to_datetime = StringToTime(strTime);
       PrintFormat("processing %s: %s->%s", symbol, TimeToString(from_datetime), TimeToString(to_datetime));
       string filename = StringFormat("%s_%s_%s.csv", symbol, TimeToString(from_datetime), TimeToString(to_datetime));
-      double ticks[];
+      MqlTick ticks[];
       ZeroMemory(ticks);
       int copyTime = CopyTicksRange(symbol, ticks, COPY_TICKS_ALL, from_datetime, to_datetime);
       // write to file      
       int file = FileOpen(output + "\\" + filename, FILE_WRITE|FILE_COMMON);
       // save to file
-      size = ArraySize(ticks);
+      int size = ArraySize(ticks);
       FileWriteString(file, "datetime\tbid\task\tlast\tvolume\ttime_msc\tflags\tvolumn_real\n");
       for (int i = 0 ; i < size ; i++) {
         FileWriteString(file,
