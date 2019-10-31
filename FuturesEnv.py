@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import pickle;
 import numpy as np;
 import tensorflow as tf;
 from tf_agents.environments import py_environment;
@@ -13,7 +14,7 @@ from tf_agents.trajectories import time_step as ts;
 
 class FuturesEnv(py_environment.PyEnvironment):
 
-    def __init__(self, capital = 10000.0, dataset = None):
+    def __init__(self, capital = 10000.0, dataset = 'dataset.pkl'):
 
         assert type(capital) is float and capital > 0;
         self._action_spec = array_spec.BoundedArraySpec(
@@ -39,6 +40,8 @@ class FuturesEnv(py_environment.PyEnvironment):
         self._episode_ended = False;
         # customized member
         self.capital = capital;
+        with open(dataset, 'rb') as f:
+            dataset = pickle.loads(f.read());
         self.dataset = dataset;
         self.index = 0;
 
@@ -134,5 +137,5 @@ class FuturesEnv(py_environment.PyEnvironment):
 if __name__ == "__main__":
 
     assert True == tf.executing_eagerly();
-    env = tf_py_environment.TFPyEnvironment(FuturesEnv(dataset = np.random.normal(size = (100,2))));
+    env = tf_py_environment.TFPyEnvironment(FuturesEnv());
 

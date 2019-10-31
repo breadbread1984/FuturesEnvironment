@@ -25,11 +25,19 @@ the MQL5 downloaded file was encoded in UTF16. you need to convert it into utf8 
 make -C cc
 ```
 
-run the converter with command
+run the converter with command to extract bid and ask price
 
 ```bash
 ./cc/convert -i <path/to/dataset/file> -o <path/to/output>
 ```
+
+create dataset with command to generate numpy tensor
+
+```bash
+python3 create_dataset.py <path/to/file>
+```
+
+then you can see a file called dataset.pkl generated under current directory.
 
 ## environment specification
 the observation is a vector of length 2 which represents the sell price and buy price by minites respectively.
