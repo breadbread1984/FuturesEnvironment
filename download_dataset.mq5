@@ -40,7 +40,8 @@ void OnStart()
                                      IntegerToString(y) + "." + IntegerToString(to_month) + "." + IntegerToString(last_day));
       MqlTick ticks[];
       ZeroMemory(ticks);
-      int copyTime = CopyTicksRange(symbol, ticks, COPY_TICKS_ALL, from_datetime, to_datetime);
+      // int copyTime = CopyTicksRange(symbol, ticks, COPY_TICKS_INFO, from_datetime, to_datetime);
+      int copyTime = CopyTicks(symbol, ticks, COPY_TICKS_INFO, from_datetime, 100000000);
       // write to file      
       int file = FileOpen(output + "/" + filename, FILE_WRITE|FILE_UNICODE);
       // save to file
@@ -48,7 +49,7 @@ void OnStart()
       FileWriteString(file, "datetime\tbid\task\tlast\tvolume\ttime_msc\tflags\tvolumn_real\n");
       for (int i = 0 ; i < size ; i++) {
         FileWriteString(file,
-                        StringFormat("%s\t%df\t%df\t%df\t%d\t%d\t%d\t%df\n",
+                        StringFormat("%s\t%f\t%f\t%f\t%d\t%d\t%d\t%f\n",
                                      TimeToString(ticks[i].time),
                                      ticks[i].bid,
                                      ticks[i].ask,
