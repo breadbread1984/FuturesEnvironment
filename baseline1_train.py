@@ -1,15 +1,55 @@
 #!/usr/bin/python3
 
 import tensorflow as tf;
+import tensorflow_probability as tfp;
 from tf_agents.environments import tf_py_environment, suite_gym; # environment and problem
 from tf_agents.agents.ppo import ppo_agent; # ppo agent
-from tf_agents.networks import actor_distribution_network; # network structure
+from tf_agents.networks import network, utils;
 from tf_agents.trajectories import time_step, trajectory;
 from tf_agents.replay_buffers import tf_uniform_replay_buffer; # replay buffer
 from tf_agents.policies import random_tf_policy, policy_saver; # random policy
 from FuturesEnv import FuturesEnv;
 
 batch_size = 64;
+
+class ActorNetwork(network.DistributionNetwork):
+
+    def __init__(self, obs_spec, action_spec, logits_init_output_factor = 0.1, name = 'ActorNetwork'):
+
+        super(ActorNetwork, self).__init__(
+            input_tensor_spec = None,
+            state_spec = obs_spec,
+            output_spec = action_spec,
+            name = name);
+        num_actions = action_spec.maximum - action_spec.minimum + 1;
+        self._projection_layers = {
+            'lever': tf.keras.layers.Dense(
+                         num_actions[0],
+                         kernel_initializer = tf.keras.initializers.VarianceScaling(scale = logits_init_output_factor),
+                         bias_initializer = tf.keras.initializers.Zeros(),
+                         name = 'lever_logits'),
+            'sellprice': tf.keras.layers.Dense(
+                              num_actions[1],
+                              kernel_initializer = tf.keras.initializers.VarianceScaling(scale = logits_init_output_factor),
+                              bias_initializer = tf.keras.initializers.Zeros(),
+                              name = 'sell_price_logits'),
+            'buyprice': tf.keras.layers.Dense(
+                             num_actions[2],
+                             kernel_initializer = tf.keras.initializers.VarianceScaling(scale = logits_init_output_factor),
+                             bias_initializer = tf.keras.initializers.Zeros(),
+                             name = 'buy_price_logits')};
+
+    def call(self, inputs, outer_rank):
+
+        flatten = tf.keras.layers.Faltten()(inputs);
+        flatten = tf.cast(flatten, dtype = tf.float32);
+        logits = {key: projection_layer(flatten) for key, projection_layer in self._projection_layers.items()};
+        def model():
+            lever = yield tfp.distributions.JointDistributionCoroutine.Root(tfp.distributions.Categorical(logits['lever']));
+            sellprice = yield tfp.distributions.JointDistributionCoroutine.Root(tfp.distributions.Categorical(logits['sellprice']));
+            buyprice = yield tfp.distributions.JointDistributionCoroutine.Root(tfp.distributions.Categorical(logits['buyprice']));
+        action = tfp.distributions.JointDistributionCoroutine(model);
+        return action;
 
 def main():
 
@@ -22,8 +62,8 @@ def main():
         time_step.time_step_spec(train_env.observation_spec()),
         train_env.action_spec(),
         optimizer = optimizer,
-        actor_net = actor_distribution_network.ActorDistributionNetwork(train_env.observation_spec(),
-                                                                        train_env.action_spec()),
+        actor_net = ActorNetwork(train_env.observation_spec(),
+                                 train_env.action_spec()),
         check_numerics = True
     );
     tf_agent.initialize();
