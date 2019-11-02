@@ -17,12 +17,12 @@ class ActorNetwork(network.DistributionNetwork):
     def __init__(self, obs_spec, action_spec, logits_init_output_factor = 0.1, name = 'ActorNetwork'):
 
         super(ActorNetwork, self).__init__(
-            input_tensor_spec = None,
-            state_spec = obs_spec,
+            input_tensor_spec = obs_spec,
+            state_spec = (),
             output_spec = action_spec,
             name = name);
         num_actions = action_spec.maximum - action_spec.minimum + 1;
-        self._projection_layers = {
+        self._layers = {
             'lever': tf.keras.layers.Dense(
                          num_actions[0],
                          kernel_initializer = tf.keras.initializers.VarianceScaling(scale = logits_init_output_factor),
@@ -39,17 +39,37 @@ class ActorNetwork(network.DistributionNetwork):
                              bias_initializer = tf.keras.initializers.Zeros(),
                              name = 'buy_price_logits')};
 
-    def call(self, inputs, outer_rank):
+    def call(self, inputs, step_type = None, network_state = ()):
 
         flatten = tf.keras.layers.Faltten()(inputs);
         flatten = tf.cast(flatten, dtype = tf.float32);
-        logits = {key: projection_layer(flatten) for key, projection_layer in self._projection_layers.items()};
+        logits = {key: projection_layer(flatten) for key, projection_layer in self._layers.items()};
         def model():
             lever = yield tfp.distributions.JointDistributionCoroutine.Root(tfp.distributions.Categorical(logits['lever']));
             sellprice = yield tfp.distributions.JointDistributionCoroutine.Root(tfp.distributions.Categorical(logits['sellprice']));
             buyprice = yield tfp.distributions.JointDistributionCoroutine.Root(tfp.distributions.Categorical(logits['buyprice']));
         action = tfp.distributions.JointDistributionCoroutine(model);
         return action;
+
+class ValueNetwork(network.Network):
+
+    def __init__(self, obs_spec, name = "ValueNetwork"):
+
+        super(ValueNetwork, self).__init__(
+            input_tensor_spec = obs_spec,
+            state_spec = (),
+            name = name);
+        self._layer = tf.keras.layers.Dense(
+            1, 
+            kernel_initializer = tf.keras.initializers.Constant([2,1]),
+            bias_initializer = tf.keras.initializers.Constant([5]));
+
+    def call(self, inputs, step_type = None, network_state = ()):
+
+        flatten = tf.keras.layers.Flatten()(inputs);
+        flatten = tf.cast(flatten, dtype = tf.float32);
+        logits = self._layer(flatten);
+        return logits, network_state;
 
 def main():
 
@@ -64,6 +84,7 @@ def main():
         optimizer = optimizer,
         actor_net = ActorNetwork(train_env.observation_spec(),
                                  train_env.action_spec()),
+        value_net = ValueNetwork(train_env.observation_spec()),
         check_numerics = True
     );
     tf_agent.initialize();
