@@ -43,7 +43,7 @@ class FuturesEnv(py_environment.PyEnvironment):
         with open(dataset, 'rb') as f:
             dataset = pickle.loads(f.read());
         self.dataset = dataset;
-        self.index = 0;
+        self.index = np.random.randint(low = 0, high = 100000, size = ());
 
     def action_spec(self):
 
@@ -59,7 +59,7 @@ class FuturesEnv(py_environment.PyEnvironment):
         self._profit = 0;
         self._episode_ended = False;
         # customized member
-        self.index = 0;
+        self.index = np.random.randint(low = 0, high = 100000, size = ());
         return ts.restart((self.dataset[self.index] ,self._profit));
 
     def _step(self, action):
