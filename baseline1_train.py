@@ -85,7 +85,8 @@ def main():
         actor_net = ActorNetwork(train_env.observation_spec(),
                                  train_env.action_spec()),
         value_net = ValueNetwork(train_env.observation_spec()),
-        check_numerics = True
+        use_gae = True,
+        lambda_value = 0.95
     );
     tf_agent.initialize();
     # replay buffer 
