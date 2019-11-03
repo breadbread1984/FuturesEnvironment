@@ -5,6 +5,7 @@ import tensorflow_probability as tfp;
 from tf_agents.environments import tf_py_environment, suite_gym; # environment and problem
 from tf_agents.agents.ppo import ppo_agent; # ppo agent
 from tf_agents.networks import network, utils;
+from tf_agents.specs import tensor_spec, distribution_spec;
 from tf_agents.trajectories import time_step, trajectory;
 from tf_agents.replay_buffers import tf_uniform_replay_buffer; # replay buffer
 from tf_agents.policies import random_tf_policy, policy_saver; # random policy
@@ -16,13 +17,19 @@ class ActorNetwork(network.DistributionNetwork):
 
     def __init__(self, obs_spec, action_spec, logits_init_output_factor = 0.1, name = 'ActorNetwork'):
 
+        input_param_shapes = tf.TensorSpec((3,), dtype = tf.int32);
+        output_spec = distribution_spec.DistributionSpec(
+            tfp.distributions.JointDistributionCoroutine,
+            tf.nest.map_structure(lambda tensor_shape: tensor_spec.TensorSpec(shape = tensor_shape, dtype = action_spec.dtype), input_param_shapes),
+            sample_spec = action_spec
+        );
         super(ActorNetwork, self).__init__(
             input_tensor_spec = obs_spec,
             state_spec = (),
-            output_spec = action_spec,
+            output_spec = output_spec,
             name = name);
         num_actions = action_spec.maximum - action_spec.minimum + 1;
-        self._layers = {
+        self.denses = {
             'lever': tf.keras.layers.Dense(
                          num_actions[0],
                          kernel_initializer = tf.keras.initializers.VarianceScaling(scale = logits_init_output_factor),
@@ -41,9 +48,9 @@ class ActorNetwork(network.DistributionNetwork):
 
     def call(self, inputs, step_type = None, network_state = ()):
 
-        flatten = tf.keras.layers.Faltten()(inputs);
-        flatten = tf.cast(flatten, dtype = tf.float32);
-        logits = {key: projection_layer(flatten) for key, projection_layer in self._layers.items()};
+        flatten = tf.keras.layers.Flatten()(inputs);
+        flatten = tf.keras.layers.Lambda(lambda x: tf.cast(x, dtype = tf.float32))(flatten);
+        logits = {key: dense(flatten) for key, dense in self.denses.items()};
         def model():
             lever = yield tfp.distributions.JointDistributionCoroutine.Root(tfp.distributions.Categorical(logits['lever']));
             sellprice = yield tfp.distributions.JointDistributionCoroutine.Root(tfp.distributions.Categorical(logits['sellprice']));
@@ -59,7 +66,7 @@ class ValueNetwork(network.Network):
             input_tensor_spec = obs_spec,
             state_spec = (),
             name = name);
-        self._layer = tf.keras.layers.Dense(
+        self.dense = tf.keras.layers.Dense(
             1, 
             kernel_initializer = tf.keras.initializers.Constant([2,1]),
             bias_initializer = tf.keras.initializers.Constant([5]));
@@ -67,8 +74,8 @@ class ValueNetwork(network.Network):
     def call(self, inputs, step_type = None, network_state = ()):
 
         flatten = tf.keras.layers.Flatten()(inputs);
-        flatten = tf.cast(flatten, dtype = tf.float32);
-        logits = self._layer(flatten);
+        flatten = tf.keras.layers.Lambda(lambda x: tf.cast(x, dtype = tf.float32))(flatten);
+        logits = self.dense(flatten);
         return logits, network_state;
 
 def main():
@@ -85,6 +92,7 @@ def main():
         actor_net = ActorNetwork(train_env.observation_spec(),
                                  train_env.action_spec()),
         value_net = ValueNetwork(train_env.observation_spec()),
+        normalize_observations = False,
         use_gae = True,
         lambda_value = 0.95
     );
