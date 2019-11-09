@@ -17,7 +17,6 @@ class ActorNetwork(network.DistributionNetwork):
 
     def __init__(self, obs_spec, action_spec, logits_init_output_factor = 0.1, name = 'ActorNetwork'):
 
-        input_param_shapes = tf.TensorSpec((3,), dtype = tf.int32);
         output_spec = distribution_spec.DistributionSpec(tfp.distributions.JointDistributionSequential, None, action_spec);
         super(ActorNetwork, self).__init__(
             input_tensor_spec = obs_spec,
@@ -25,6 +24,7 @@ class ActorNetwork(network.DistributionNetwork):
             output_spec = output_spec,
             name = name);
         num_actions = action_spec.maximum - action_spec.minimum + 1;
+        self.gru = tf.keras.layers.GRU(units = 100, name = "gru");
         self.lever_dense = tf.keras.layers.Dense(
             num_actions[0],
             kernel_initializer = tf.keras.initializers.VarianceScaling(scale = logits_init_output_factor),
@@ -44,10 +44,12 @@ class ActorNetwork(network.DistributionNetwork):
     def call(self, inputs, step_type = None, network_state = ()):
 
         flatten = tf.keras.layers.Flatten()(inputs);
-        flatten = tf.keras.layers.Lambda(lambda x: tf.cast(x, dtype = tf.float32))(flatten);
-        lever_logits = self.lever_dense(flatten);
-        sellprice_logits = self.sellprice_dense(flatten);
-        buyprice_logits = self.buyprice_dense(flatten);
+        # flatten.shape = (batch, seq_len, channel)
+        flatten = tf.keras.layers.Lambda(lambda x: tf.expand_dims(tf.cast(x, dtype = tf.float32), axis = 1))(flatten);
+        embedding = self.gru(flatten);
+        lever_logits = self.lever_dense(embedding);
+        sellprice_logits = self.sellprice_dense(embedding);
+        buyprice_logits = self.buyprice_dense(embedding);
         action = tfp.distributions.JointDistributionSequential([
             tfp.distributions.Categorical(lever_logits),
             tfp.distributions.Categorical(sellprice_logits),
